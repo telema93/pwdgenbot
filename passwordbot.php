@@ -148,7 +148,7 @@ function sendMessage($chat_id, $text, $mode = "Markdown") {
     ]));
 }
 
-function sendButtons($chat_id, $text = "Выберите тип пароля:") {
+function sendButtons($chat_id, $text = "Выберите тип пароля:", $mode = "Markdown") {
     global $api, $config;
 
     $buttons = [[
@@ -164,22 +164,18 @@ function sendButtons($chat_id, $text = "Выберите тип пароля:") 
     $data = [
         'chat_id' => $chat_id,
         'text' => $text,
+        'parse_mode' => $mode,
         'reply_markup' => json_encode(['inline_keyboard' => $buttons]),
-        'parse_mode' => 'Markdown'
+        'disable_web_page_preview' => true
     ];
     file_get_contents($api . "/sendMessage?" . http_build_query($data));
 }
 
-function answerCallback($callback_id) {
-    global $api;
-    file_get_contents($api . "/answerCallbackQuery?callback_query_id=$callback_id");
-}
-
 function sendIntro($chat_id) {
-    $text = <<<TXT
-👋 Добро пожаловать в генератор паролей!
+   $text = <<<HTML
+👋 <b>Добро пожаловать в генератор паролей!</b>
 
-Вы можете отправить команду вида: `12A2s2` — это значит:
+Вы можете отправить команду вида: <code>12A2s2</code> — это значит:
 - 12 символов
 - минимум 2 заглавных (A2)
 - минимум 2 спецсимвола (s2)
@@ -187,9 +183,9 @@ function sendIntro($chat_id) {
 Или просто нажмите одну из кнопок ниже.
 
 ℹ️ Мы не сохраняем сгенерированные пароли. Повторить сгенерированный пароль нельзя.
-💻 Исходный код бота: [GitHub](https://github.com/telema93/pwdgenbot)
+💻 Исходный код бота: <a href="https://github.com/telema93/pwdgenbot">github.com/telema93/pwdgenbot</a>
 📵 Бот работает только в личных сообщениях.
-TXT;
-
-    sendButtons($chat_id, $text);
+HTML;
+    
+    sendButtons($chat_id, $text, "HTML");
 }
