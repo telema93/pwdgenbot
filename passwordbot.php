@@ -143,7 +143,8 @@ function sendMessage($chat_id, $text, $mode = "Markdown") {
     file_get_contents("$api/sendMessage?" . http_build_query([
         'chat_id' => $chat_id,
         'text' => $text,
-        'parse_mode' => $mode
+        'parse_mode' => $mode,
+        'disable_web_page_preview' => true                                                     
     ]));
 }
 
