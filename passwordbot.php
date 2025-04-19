@@ -6,33 +6,27 @@ $api = "https://api.telegram.org/bot$token";
 
 require_once 'passwordbot_db.php';
 
+// === Получение update и логирование
 $update = json_decode(file_get_contents("php://input"), true);
+file_put_contents(__DIR__ . "/logs.txt", json_encode($update, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n---\n", FILE_APPEND);
+
+// === Определение переменных
 $callback = $update['callback_query'] ?? null;
-$message = $update['message']['text'] ?? '';
-$chat_id = $update['message']['chat']['id'] ?? null;
+$message_obj = $update['message'] ?? null;
+$message = $message_obj['text'] ?? '';
+$chat_id = $message_obj['chat']['id'] ?? null;
+$user_id = $message_obj['from']['id'] ?? null;
 
-$user_id = $update['message']['from']['id'] ?? ($update['callback_query']['from']['id'] ?? null);
-if (!$user_id || !$chat_id || !check_limit($user_id)) {
-    sendMessage($chat_id, "⛔ Превышен лимит сообщений. Максимум 1000 в сутки.");
-    exit;
-}
-
-$lang = $update['message']['from']['language_code']
-    ?? ($update['callback_query']['from']['language_code'] ?? null);
-$is_premium = $update['message']['from']['is_premium']
-    ?? ($update['callback_query']['from']['is_premium'] ?? null);
-update_user_info($user_id, $lang, $is_premium ? 1 : 0);
-
-// запрет на группы
-if (isset($update['message']['chat']['type']) && $update['message']['chat']['type'] !== 'private') {
-    exit;
-}
-
-// === Кнопки
+// === Обработка callback_query
 if ($callback) {
-    $chat_id = $callback['message']['chat']['id'];
-    $data = $callback['data'];
-    $password = '';
+    $chat_id = $callback['message']['chat']['id'] ?? null;
+    $user_id = $callback['from']['id'] ?? null;
+    $data = $callback['data'] ?? '';
+
+    if (!check_limit($user_id)) {
+        sendMessage($chat_id, "⛔ Превышен лимит сообщений. Максимум 1000 в сутки.");
+        exit;
+    }
 
     if ($data === 'simple') {
         $password = generate_simple_password(12);
@@ -40,11 +34,13 @@ if ($callback) {
         $password = generate_password(12, ['A'=>2,'l'=>2,'d'=>2,'s'=>2]);
     } elseif ($data === 'strong') {
         $password = generate_password(20, ['A'=>3,'l'=>3,'d'=>3,'s'=>3]);
-    } elseif ($data === 'admin_report') {
+    } elseif ($data === 'admin_report' && $user_id == $config['admin_id']) {
         $report = get_admin_report();
         answerCallback($callback['id']);
         sendMessage($chat_id, $report);
         exit;
+    } else {
+        $password = '❓ Неизвестная команда.';
     }
 
     answerCallback($callback['id']);
@@ -52,7 +48,28 @@ if ($callback) {
     exit;
 }
 
-// Парсинг шаблона
+// === Обработка обычного сообщения
+if (!$message && isset($update['message']['entities'])) {
+    sendIntro($chat_id);
+    exit;
+}
+
+if (!$user_id || !$chat_id || !check_limit($user_id)) {
+    sendMessage($chat_id, "⛔ Превышен лимит сообщений. Максимум 1000 в сутки.");
+    exit;
+}
+
+// Обновляем данные о пользователе
+$lang = $message_obj['from']['language_code'] ?? null;
+$is_premium = $message_obj['from']['is_premium'] ?? null;
+update_user_info($user_id, $lang, $is_premium ? 1 : 0);
+
+// Если группа — игнорируем
+if ($message_obj['chat']['type'] !== 'private') {
+    exit;
+}
+
+// === Парсинг шаблона
 preg_match('/(\d+)([Alds\d]*)/i', $message, $matches);
 if (!isset($matches[1])) {
     sendIntro($chat_id);
